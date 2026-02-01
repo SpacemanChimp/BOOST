@@ -57,6 +57,25 @@
     { key: "pure_strong", label: "Pure Strong", prefix: "Pure Strong", isPure: true },
   ];
 
+  // Ice yields (assuming perfect refining, 0% waste), per 1 block of ice.
+  // Source values match the common EVE Uni reference table.
+  // We keep this lightweight and static so the site stays GitHub Pages friendly.
+  const ICE_YIELDS = {
+    // Faction ice (includes one isotope type)
+    "Clear Icicle": { heavyWater: 69, liquidOzone: 35, strontium: 1, isotope: "Helium Isotopes", isotopeQty: 414 },
+    "White Glaze": { heavyWater: 69, liquidOzone: 35, strontium: 1, isotope: "Nitrogen Isotopes", isotopeQty: 414 },
+    "Blue Ice": { heavyWater: 69, liquidOzone: 35, strontium: 1, isotope: "Oxygen Isotopes", isotopeQty: 414 },
+    "Glacial Mass": { heavyWater: 69, liquidOzone: 35, strontium: 1, isotope: "Hydrogen Isotopes", isotopeQty: 414 },
+
+    // Standard ice (no faction isotopes)
+    "Glare Crust": { heavyWater: 1381, liquidOzone: 691, strontium: 35, isotope: null, isotopeQty: 0 },
+    "Dark Glitter": { heavyWater: 691, liquidOzone: 1381, strontium: 69, isotope: null, isotopeQty: 0 },
+    "Gelidus": { heavyWater: 345, liquidOzone: 691, strontium: 104, isotope: null, isotopeQty: 0 },
+    "Krystallos": { heavyWater: 173, liquidOzone: 691, strontium: 173, isotope: null, isotopeQty: 0 },
+  };
+
+  const ICE_NAMES = Object.keys(ICE_YIELDS);
+
   const EVETECH_ICON = (typeId, size = 64) =>
     `https://images.evetech.net/types/${typeId}/icon?size=${size}`;
 
@@ -85,11 +104,29 @@
   function fmtISK(n) {
     if (n === null || n === undefined || Number.isNaN(n)) return "—";
     const abs = Math.abs(n);
-    if (abs >= 1e12) return `${(n / 1e12).toFixed(2)}T`;
-    if (abs >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
-    if (abs >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
-    if (abs >= 1e3) return `${(n / 1e3).toFixed(2)}K`;
-    return n.toFixed(2);
+
+    // Avoid scientific notation: always render as plain numbers or K/M/B/T.
+    // ISK is effectively integer-valued for market use; show whole ISK below 1K.
+    if (abs >= 1e12) return `${trimZeros((n / 1e12).toFixed(2))}T`;
+    if (abs >= 1e9) return `${trimZeros((n / 1e9).toFixed(2))}B`;
+    if (abs >= 1e6) return `${trimZeros((n / 1e6).toFixed(2))}M`;
+    if (abs >= 1e3) return `${trimZeros((n / 1e3).toFixed(2))}K`;
+    return Math.round(n).toLocaleString();
+  }
+
+  function fmtQty(n) {
+    if (n === null || n === undefined || Number.isNaN(n)) return "—";
+    const abs = Math.abs(n);
+    if (abs >= 1e12) return `${trimZeros((n / 1e12).toFixed(2))}T`;
+    if (abs >= 1e9) return `${trimZeros((n / 1e9).toFixed(2))}B`;
+    if (abs >= 1e6) return `${trimZeros((n / 1e6).toFixed(2))}M`;
+    if (abs >= 1e3) return `${trimZeros((n / 1e3).toFixed(2))}K`;
+    return Math.round(n).toLocaleString();
+  }
+
+  function trimZeros(s) {
+    // "12.00" -> "12", "12.30" -> "12.3"
+    return String(s).replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
   }
 
   function fmtInt(n) {
@@ -377,7 +414,11 @@
       // e.g., jita: {...}
     },
     gasTrends7d: new Map(), // typeId -> pct
+    gasStats7d: new Map(), // typeId -> { first, last, min, max, avg, pct }
     gasTradesJita: new Map(), // typeId -> amount
+
+    boosterStats7d: new Map(), // typeId -> { first, last, min, max, avg, pct }
+    boosterTradesJita: new Map(), // typeId -> amount (Jita sell-side, yesterday)
   };
 
   // ---------------------------
@@ -505,6 +546,7 @@
     const allNames = [
       ...state.boosterItems.map((b) => b.name),
       ...state.gasItems.map((g) => g.name),
+      ...ICE_NAMES,
     ];
 
     const map = await resolveTypeIDsByName(allNames);
@@ -564,12 +606,20 @@
       const pct = state.gasTrends7d.get(g.typeId) ?? null;
       const trades = state.gasTradesJita.get(g.typeId) ?? null;
 
-      const regions = (g.regions || []).slice(0, 6);
-      const extra = (g.regions || []).length > 6 ? ` +${(g.regions || []).length - 6} more` : "";
+      const allRegions = (g.regions || []).filter(Boolean);
+      const shown = allRegions.slice(0, 6);
+      const rest = allRegions.slice(6);
       const regionHtml =
-        regions.length
-          ? `<div class="tag-row">${regions.map((x) => `<span class="tag">${esc(x)}</span>`).join("")}${extra ? `<span class="tag">${esc(extra)}</span>` : ""}</div>`
+        shown.length
+          ? `<div class="tag-row">${shown
+              .map((x) => `<span class="tag">${esc(x)}</span>`)
+              .join("")}${rest.length ? `<span class="tag tag-more" title="${esc(rest.join(", "))}">+${rest.length} more</span>` : ""}</div>`
           : "—";
+
+      const supplyAllHubs = HUBS.reduce((sum, h) => {
+        const v = getAggVolume(state.fuzzAgg[h.key], g.typeId, "sell") ?? 0;
+        return sum + v;
+      }, 0);
 
       const tr = document.createElement("tr");
       tr.className = SHADE_TO_COLOR[g.shade] || "";
@@ -581,7 +631,10 @@
         <td class="num">${fmtISK(d)}</td>
         <td class="num">${fmtISK(r)}</td>
         <td class="num">${pct === null ? "—" : fmtPct(pct)}</td>
-        <td class="num">${trades === null ? "—" : fmtInt(trades)}</td>
+        <td class="num">
+          <div>${trades === null ? "—" : fmtInt(trades)}</div>
+          <div class="muted small">supply: ${fmtQty(supplyAllHubs)}</div>
+        </td>
       `;
       tb.appendChild(tr);
     }
@@ -609,10 +662,21 @@
         rows.sort((a, b) => String(a.price_date).localeCompare(String(b.price_date)));
         const first = rows[0];
         const last = rows[rows.length - 1];
+
+        const prices = rows
+          .map((r) => toNumber(r.sell_price_avg, null))
+          .filter((p) => p !== null && Number.isFinite(p) && p > 0);
+
         const p0 = toNumber(first.sell_price_avg, null);
         const p1 = toNumber(last.sell_price_avg, null);
-        if (p0 && p1) {
-          state.gasTrends7d.set(tid, ((p1 - p0) / p0) * 100);
+
+        if (prices.length) {
+          const min = Math.min(...prices);
+          const max = Math.max(...prices);
+          const avg = prices.reduce((s, p) => s + p, 0) / prices.length;
+          const pct = (p0 !== null && p1 !== null && p0 > 0) ? ((p1 - p0) / p0) * 100 : null;
+          if (pct !== null) state.gasTrends7d.set(tid, pct);
+          state.gasStats7d.set(tid, { first: p0, last: p1, min, max, avg, pct });
         }
       }
     } catch (e) {
@@ -636,6 +700,76 @@
       }
     } catch (e) {
       console.warn("Gas trades unavailable", e);
+    }
+  }
+
+  // ---------------------------
+  // Booster trends + trades/day (Jita)
+  // ---------------------------
+  async function loadBoosterStats7d() {
+    const typeIds = state.boosterItems.filter((b) => b.typeId).map((b) => b.typeId);
+    if (typeIds.length === 0) return;
+
+    const end = new Date();
+    const start = new Date(end.getTime() - 8 * 24 * 3600 * 1000);
+
+    // Adam4EVE: up to ~20 typeIDs per request, so chunk.
+    const parts = chunk(typeIds, 20);
+
+    for (const part of parts) {
+      const url = `https://api.adam4eve.eu/v1/market_price_history?regionID=10000002&start=${isoDateUTC(start)}&end=${isoDateUTC(end)}&typeID=${part.join(",")}`;
+      try {
+        const data = await adamFetchJson(url, { ttlMs: 10 * 60 * 1000 });
+        const byType = new Map();
+        for (const row of data) {
+          const tid = Number(row.type_id);
+          if (!byType.has(tid)) byType.set(tid, []);
+          byType.get(tid).push(row);
+        }
+        for (const [tid, rows] of byType.entries()) {
+          rows.sort((a, b) => String(a.price_date).localeCompare(String(b.price_date)));
+          const first = rows[0];
+          const last = rows[rows.length - 1];
+
+          const prices = rows
+            .map((r) => toNumber(r.sell_price_avg, null))
+            .filter((p) => p !== null && Number.isFinite(p) && p > 0);
+
+          const p0 = toNumber(first.sell_price_avg, null);
+          const p1 = toNumber(last.sell_price_avg, null);
+
+          if (prices.length) {
+            const min = Math.min(...prices);
+            const max = Math.max(...prices);
+            const avg = prices.reduce((s, p) => s + p, 0) / prices.length;
+            const pct = (p0 !== null && p1 !== null && p0 > 0) ? ((p1 - p0) / p0) * 100 : null;
+            state.boosterStats7d.set(tid, { first: p0, last: p1, min, max, avg, pct });
+          }
+        }
+      } catch (e) {
+        console.warn("Booster trends chunk unavailable", e);
+      }
+    }
+  }
+
+  async function loadBoosterTradesJitaYesterday() {
+    const typeIds = state.boosterItems.filter((b) => b.typeId).map((b) => b.typeId);
+    if (!typeIds.length) return;
+
+    const date = getYesterdayUTC();
+    const parts = chunk(typeIds, 80); // keep URL length reasonable
+    for (const part of parts) {
+      const url = `https://api.adam4eve.eu/v1/tracker?date=${date}&isBuy=0&locationID=60003760&typeID=${part.join(",")}&withGone=0`;
+      try {
+        const data = await adamFetchJson(url, { ttlMs: 10 * 60 * 1000 });
+        for (const [tidStr, row] of Object.entries(data)) {
+          const tid = Number(tidStr);
+          const amt = toNumber(row.amount, null);
+          if (amt !== null) state.boosterTradesJita.set(tid, amt);
+        }
+      } catch (e) {
+        console.warn("Booster trades chunk unavailable", e);
+      }
     }
   }
 
@@ -734,7 +868,12 @@
   // ---------------------------
   function computeOpinionHtml() {
     const gases = state.gasItems.filter((g) => g.typeId);
-    const boosters = state.boosterItems.filter((b) => b.typeId && ["standard","improved","strong","synth"].includes(b.tierKey));
+    const boostersAll = state.boosterItems.filter((b) => b.typeId);
+    const boosters = boostersAll.filter((b) => ["standard", "improved", "strong", "synth"].includes(b.tierKey));
+
+    const gasTrendRows = gases
+      .map((g) => ({ g, s: state.gasStats7d.get(g.typeId) || null }))
+      .filter((x) => x.s && x.s.pct !== null);
 
     // Top price gases (Jita)
     const topGasByPrice = [...gases]
@@ -742,56 +881,148 @@
       .sort((a, b) => b.p - a.p)
       .slice(0, 5);
 
-    // Top trending up gases (7d)
-    const topGasUp = [...gases]
-      .map((g) => ({ g, d: state.gasTrends7d.get(g.typeId) ?? -999 }))
-      .sort((a, b) => b.d - a.d)
-      .slice(0, 5);
+    // Top trending up/down gases (7d)
+    const topGasUp = [...gasTrendRows].sort((a, b) => (b.s.pct ?? 0) - (a.s.pct ?? 0)).slice(0, 5);
+    const topGasDown = [...gasTrendRows].sort((a, b) => (a.s.pct ?? 0) - (b.s.pct ?? 0)).slice(0, 5);
 
-    // Thin market score (Jita): price / ((sellListed+1)*(soldDay+1))
+    // "Thin" gas markets (Jita heuristic)
     const thinGas = [...gases]
       .map((g) => {
         const p = getAggPrice(state.fuzzAgg.jita, g.typeId, "sell_min") ?? 0;
         const v = getAggVolume(state.fuzzAgg.jita, g.typeId, "sell") ?? 0;
         const t = state.gasTradesJita.get(g.typeId) ?? 0;
         const score = p / ((v + 1) * (t + 1));
-        return { g, score, p, v, t };
+        const supplyAllHubs = HUBS.reduce((sum, h) => sum + (getAggVolume(state.fuzzAgg[h.key], g.typeId, "sell") ?? 0), 0);
+        return { g, score, p, v, t, supplyAllHubs };
       })
       .sort((a, b) => b.score - a.score)
       .slice(0, 5);
 
-    // Thin booster score (Jita): price / (sellListed+1)
+    // "Thin" boosters (Jita listed depth heuristic)
     const thinBoosters = [...boosters]
       .map((b) => {
         const p = getAggPrice(state.fuzzAgg.jita, b.typeId, "sell_min") ?? 0;
         const v = getAggVolume(state.fuzzAgg.jita, b.typeId, "sell") ?? 0;
-        return { b, score: p / (v + 1), p, v };
+        const t = state.boosterTradesJita.get(b.typeId) ?? null;
+        const score = p / (v + 1);
+        return { b, score, p, v, t };
       })
       .sort((a, b) => b.score - a.score)
       .slice(0, 6);
 
+    function liRow(leftHtml, rightHtml) {
+      return `<li class="li-row"><span>${leftHtml}</span><span class="right muted small">${rightHtml}</span></li>`;
+    }
+
     function liGas(x) {
-      return `<li><strong>${esc(x.g.name)}</strong> — Jita ${fmtISK(x.p)} ISK/u</li>`;
+      return liRow(
+        `<strong>${esc(x.g.name)}</strong> — Jita ${fmtISK(x.p)} ISK/u`,
+        esc(x.g.boosterFamily || "")
+      );
     }
+
     function liGasTrend(x) {
-      return `<li><strong>${esc(x.g.name)}</strong> — 7d ${fmtPct(x.d)}</li>`;
+      return liRow(
+        `<strong>${esc(x.g.name)}</strong> — 7d ${fmtPct(x.s.pct)}`,
+        esc(x.g.boosterFamily || "")
+      );
     }
+
     function liThinGas(x) {
-      return `<li><strong>${esc(x.g.name)}</strong> — thin score ${x.score.toExponential(2)} (Jita ${fmtISK(x.p)} | listed ${fmtInt(x.v)} | sold/day ${fmtInt(x.t)})</li>`;
+      return liRow(
+        `<strong>${esc(x.g.name)}</strong> — Jita ${fmtISK(x.p)} · listed ${fmtQty(x.v)} · sold/day ${fmtQty(x.t)} · supply ${fmtQty(x.supplyAllHubs)}`,
+        esc(x.g.boosterFamily || "")
+      );
     }
+
     function liThinBooster(x) {
-      return `<li><strong>${esc(x.b.name)}</strong> — thin score ${x.score.toExponential(2)} (Jita ${fmtISK(x.p)} | listed ${fmtInt(x.v)})</li>`;
+      const t = x.t === null ? "—" : fmtQty(x.t);
+      return `<li><strong>${esc(x.b.name)}</strong> — Jita ${fmtISK(x.p)} · listed ${fmtQty(x.v)} · sold/day ${t}</li>`;
     }
+
+    // Flip ideas --------------------------------------------------
+    function flipThreshold(stats, fallbackNow) {
+      if (stats && Number.isFinite(stats.min) && stats.min > 0) {
+        // Buy if we revisit (roughly) the lower end of the last 7 days.
+        return stats.min * 1.10; // 10% above 7d low
+      }
+      if (fallbackNow && fallbackNow > 0) return fallbackNow * 0.90;
+      return null;
+    }
+
+    function flipTarget(stats, fallbackNow) {
+      if (stats && Number.isFinite(stats.max) && stats.max > 0) return stats.max * 0.95;
+      if (fallbackNow && fallbackNow > 0) return fallbackNow * 1.10;
+      return null;
+    }
+
+    function volatility(stats) {
+      if (!stats || !Number.isFinite(stats.avg) || stats.avg <= 0) return 0;
+      const range = (stats.max ?? 0) - (stats.min ?? 0);
+      return range > 0 ? range / stats.avg : 0;
+    }
+
+    const gasFlip = gases
+      .map((g) => {
+        const now = getAggPrice(state.fuzzAgg.jita, g.typeId, "sell_min") ?? null;
+        const stats = state.gasStats7d.get(g.typeId) || null;
+        const vol = volatility(stats);
+        const sold = state.gasTradesJita.get(g.typeId) ?? 0;
+        const listed = getAggVolume(state.fuzzAgg.jita, g.typeId, "sell") ?? 0;
+        const score = vol * Math.log1p(sold) / Math.log1p(listed + 1);
+        return { kind: "gas", g, now, stats, vol, sold, listed, score };
+      })
+      .filter((x) => x.now && x.now > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+
+    const boosterFlipReady = state.boosterStats7d.size > 0;
+    const boosterFlip = boosterFlipReady
+      ? boosters
+          .map((b) => {
+            const now = getAggPrice(state.fuzzAgg.jita, b.typeId, "sell_min") ?? null;
+            const stats = state.boosterStats7d.get(b.typeId) || null;
+            const vol = volatility(stats);
+            const sold = state.boosterTradesJita.get(b.typeId) ?? 0;
+            const listed = getAggVolume(state.fuzzAgg.jita, b.typeId, "sell") ?? 0;
+            const score = vol * Math.log1p(sold) / Math.log1p(listed + 1);
+            return { kind: "booster", b, now, stats, vol, sold, listed, score };
+          })
+          .filter((x) => x.now && x.now > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 7)
+      : [];
+
+    function liFlipGas(x) {
+      const buy = flipThreshold(x.stats, x.now);
+      const sell = flipTarget(x.stats, x.now);
+      const band = x.stats ? `7d low ${fmtISK(x.stats.min)} · high ${fmtISK(x.stats.max)}` : "7d stats —";
+      return liRow(
+        `<strong>${esc(x.g.name)}</strong> — now ${fmtISK(x.now)} ISK/u · buy ≤ ${buy === null ? "—" : fmtISK(buy)} · sell ~ ${sell === null ? "—" : fmtISK(sell)} · sold/day ${fmtQty(x.sold)}`,
+        esc(x.g.boosterFamily || "")
+      );
+    }
+
+    function liFlipBooster(x) {
+      const buy = flipThreshold(x.stats, x.now);
+      const sell = flipTarget(x.stats, x.now);
+      const band = x.stats ? `7d low ${fmtISK(x.stats.min)} · high ${fmtISK(x.stats.max)}` : "7d stats —";
+      return `<li><strong>${esc(x.b.name)}</strong> — now ${fmtISK(x.now)} · buy ≤ ${buy === null ? "—" : fmtISK(buy)} · sell ~ ${sell === null ? "—" : fmtISK(sell)} · sold/day ${fmtQty(x.sold)} · listed ${fmtQty(x.listed)}<div class="muted small">${band}</div></li>`;
+    }
+
+    const anyGasTrends = gasTrendRows.length > 0;
 
     return `
       <p>
-        This section is generated from live hub prices (Fuzzworks) plus a 7‑day price trend and a “trades/day” estimate for gasses (Adam4EVE).
+        This section is generated from live hub prices (Fuzzworks) plus a 7‑day price history and trades/day estimates (Adam4EVE).
+        If an item shows “—” for trend/sold-day, it means the API had no data for that item at the time of load.
       </p>
 
       <h3>Where effort may pay off</h3>
-      <ul>
-        ${topGasUp.map(liGasTrend).join("")}
-      </ul>
+      ${anyGasTrends ? `<ul>${topGasUp.map(liGasTrend).join("")}</ul>` : `<p class="muted">Trend data unavailable right now.</p>`}
+
+      <h3>Where a dip may be a buy</h3>
+      ${anyGasTrends ? `<ul>${topGasDown.map(liGasTrend).join("")}</ul>` : `<p class="muted">Trend data unavailable right now.</p>`}
 
       <h3>Highest ISK/unit gasses (Jita)</h3>
       <ul>
@@ -808,9 +1039,25 @@
         ${thinBoosters.map(liThinBooster).join("")}
       </ul>
 
+      <details class="mt">
+        <summary><strong>Flip watchlist (buy-the-dip)</strong> <span class="muted small">(rules-of-thumb)</span></summary>
+        <p class="muted small">
+          Heuristic: “buy” trigger is ~10% above the 7‑day low; “sell” target is ~5% below the 7‑day high.
+          Use Jita sell min as the live signal. High sold/day is easier to exit; thin listed depth can be easier to push.
+        </p>
+
+        <h4 class="mt">Gasses</h4>
+        <ul>
+          ${gasFlip.map(liFlipGas).join("")}
+        </ul>
+
+        <h4 class="mt">Boosters</h4>
+        ${boosterFlipReady ? `<ul>${boosterFlip.map(liFlipBooster).join("")}</ul>` : `<p class="muted">Booster history is still loading… (Adam4EVE rate limit)</p>`}
+      </details>
+
       <p class="muted small">
         Interpretation: “thin” items are easier to push around with stockpiles because fewer units are listed and/or turning over.
-        “High trend” items suggest demand pressure or supply constraints. Use caution: sudden spikes often mean reversion risk.
+        Strong trends can mean real demand — or a temporary spike that later mean-reverts.
       </p>
     `;
   }
@@ -883,6 +1130,118 @@
     }
 
     return totalCost;
+  }
+
+  function computeIceEquivalents(rawTotals) {
+    // Goal: translate ice-products (isotopes / HW / LO / Stront) into an approximate
+    // number of ice blocks to harvest, using a simple 2-step plan:
+    // 1) Mine the faction ice required for each isotope type present (to cover isotopes).
+    // 2) If HW/LO/Stront are still short after byproducts, top-up with the single best "standard" ice.
+
+    const need = {
+      heavyWater: 0,
+      liquidOzone: 0,
+      strontium: 0,
+      isotopes: {
+        "Helium Isotopes": 0,
+        "Nitrogen Isotopes": 0,
+        "Oxygen Isotopes": 0,
+        "Hydrogen Isotopes": 0,
+      },
+    };
+
+    for (const r of rawTotals || []) {
+      const name = String(r.name || "").toLowerCase();
+      const qty = toNumber(r.qty, 0);
+      if (!qty) continue;
+      if (name === "heavy water") need.heavyWater += qty;
+      else if (name === "liquid ozone") need.liquidOzone += qty;
+      else if (name === "strontium clathrates") need.strontium += qty;
+      else if (name === "helium isotopes") need.isotopes["Helium Isotopes"] += qty;
+      else if (name === "nitrogen isotopes") need.isotopes["Nitrogen Isotopes"] += qty;
+      else if (name === "oxygen isotopes") need.isotopes["Oxygen Isotopes"] += qty;
+      else if (name === "hydrogen isotopes") need.isotopes["Hydrogen Isotopes"] += qty;
+    }
+
+    const plan = [];
+    let producedHW = 0;
+    let producedLO = 0;
+    let producedStront = 0;
+
+    // Step 1: isotope ice
+    for (const [iceName, y] of Object.entries(ICE_YIELDS)) {
+      if (!y.isotope) continue;
+      const req = need.isotopes[y.isotope] || 0;
+      if (req <= 0) continue;
+      const blocks = Math.ceil(req / Math.max(1, y.isotopeQty || 1));
+      if (blocks <= 0) continue;
+      producedHW += blocks * (y.heavyWater || 0);
+      producedLO += blocks * (y.liquidOzone || 0);
+      producedStront += blocks * (y.strontium || 0);
+      plan.push({
+        iceName,
+        blocks,
+        covers: y.isotope,
+      });
+    }
+
+    // Step 2: top-up HW/LO/Stront with best standard ice (single choice)
+    const remHW = Math.max(0, need.heavyWater - producedHW);
+    const remLO = Math.max(0, need.liquidOzone - producedLO);
+    const remStront = Math.max(0, need.strontium - producedStront);
+
+    if (remHW > 0 || remLO > 0 || remStront > 0) {
+      const standardNames = Object.entries(ICE_YIELDS)
+        .filter(([_, y]) => !y.isotope)
+        .map(([n]) => n);
+
+      let best = null;
+      for (const name of standardNames) {
+        const y = ICE_YIELDS[name];
+        const blocks = Math.max(
+          remHW > 0 ? Math.ceil(remHW / Math.max(1, y.heavyWater || 1)) : 0,
+          remLO > 0 ? Math.ceil(remLO / Math.max(1, y.liquidOzone || 1)) : 0,
+          remStront > 0 ? Math.ceil(remStront / Math.max(1, y.strontium || 1)) : 0
+        );
+        if (best === null || blocks < best.blocks) best = { iceName: name, blocks };
+      }
+      if (best && best.blocks > 0) {
+        plan.push({ iceName: best.iceName, blocks: best.blocks, covers: "HW/LO/Stront top‑up" });
+      }
+    }
+
+    // Sort by blocks desc so the biggest requirement is first
+    plan.sort((a, b) => b.blocks - a.blocks);
+    return plan;
+  }
+
+  function renderIceEquivalents(rawTotals, totalRuns) {
+    const details = document.getElementById("iceEquivalentsDetails");
+    const tb = document.querySelector("#iceEquivalentsTable tbody");
+    if (!details || !tb) return;
+
+    tb.innerHTML = "";
+
+    const plan = computeIceEquivalents(rawTotals);
+    if (!plan.length) {
+      details.style.display = "none";
+      return;
+    }
+
+    details.style.display = "block";
+
+    for (const row of plan) {
+      const typeId = state.typeNameToId?.[row.iceName] || null;
+      const perRun = row.blocks / Math.max(1, totalRuns);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${makeItemCell({ typeId, name: row.iceName })}</td>
+        <td class="num">${fmtQty(row.blocks)}</td>
+        <td class="num">${trimZeros(perRun.toFixed(2))}</td>
+        <td>${esc(row.covers)}</td>
+      `;
+      tb.appendChild(tr);
+    }
   }
 
   function renderMarketStats(typeId, tradesByHubKey) {
@@ -1007,6 +1366,8 @@
     // Render tables
     renderDirectMaterials(directMats, totalRuns);
 
+    let effectiveRawTotals = rawTotals;
+
     const totalMaterialCost = maxDepth > 0
       ? renderRawMaterials(rawTotals, totalRuns, costHubKey, inputPriceMode)
       : (() => {
@@ -1020,8 +1381,12 @@
           // still show a raw table using direct mats
           const pseudoRaw = directMats.map((m) => ({ typeId: m.typeId, name: m.name, qty: m.qtyPerRun * totalRuns }));
           renderRawMaterials(pseudoRaw, totalRuns, costHubKey, inputPriceMode);
+          effectiveRawTotals = pseudoRaw;
           return sum;
         })();
+
+    // Ice equivalents (approx.) derived from expanded raw totals
+    renderIceEquivalents(effectiveRawTotals, totalRuns);
 
     const totalCostAllIn = totalMaterialCost + bpcCost;
 
@@ -1120,6 +1485,18 @@
       renderBoosterBoards();
 
       $("#opinion").innerHTML = computeOpinionHtml();
+
+      // Booster analytics (price history + trades/day) are more expensive (Adam4EVE rate limit).
+      // Load them asynchronously after the initial page paint, then refresh the opinion panel.
+      (async () => {
+        try {
+          await loadBoosterTradesJitaYesterday();
+          await loadBoosterStats7d();
+          $("#opinion").innerHTML = computeOpinionHtml();
+        } catch (e) {
+          console.warn("Booster analytics unavailable", e);
+        }
+      })();
 
       $("#apiStatus").textContent = "APIs: ready";
       $("#apiStatus").classList.remove("pill-warn");

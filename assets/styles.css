@@ -30,6 +30,7 @@ body{
               radial-gradient(900px 600px at 50% 100%, rgba(239,68,68,0.12), transparent),
               var(--bg);
   color: var(--text);
+  overflow-x: hidden;
 }
 
 a{color: var(--primary); text-decoration:none}
@@ -152,6 +153,16 @@ input:focus, select:focus{border-color: rgba(125,211,252,0.55); box-shadow: 0 0 
   font-size:.75rem;
   color: rgba(255,255,255,0.72);
 }
+
+.tag-more{cursor: help;}
+
+.li-row{
+  display:flex;
+  justify-content: space-between;
+  gap: .9rem;
+  align-items: baseline;
+}
+.li-row .right{white-space: nowrap;}
 
 .item-cell{display:flex; gap:.55rem; align-items:center; min-width: 280px;}
 .item-cell img{width:28px; height:28px; border-radius: 6px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);}
