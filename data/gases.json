@@ -1,0 +1,215 @@
+[
+  {
+    "name": "Amber Cytoserocin",
+    "category": "cytoserocin",
+    "shade": "amber",
+    "boosterFamily": "Blue Pill",
+    "regions": [
+      "The Forge (low-sec)",
+      "Vale of the Silent (E-8CSQ)"
+    ]
+  },
+  {
+    "name": "Azure Cytoserocin",
+    "category": "cytoserocin",
+    "shade": "azure",
+    "boosterFamily": "Sooth Sayer",
+    "regions": [
+      "Molden Heath (low-sec)",
+      "Wicked Creek (760-9C)"
+    ]
+  },
+  {
+    "name": "Celadon Cytoserocin",
+    "category": "cytoserocin",
+    "shade": "celadon",
+    "boosterFamily": "Exile",
+    "regions": [
+      "Solitude (low-sec)",
+      "Fountain (Pegasus)"
+    ]
+  },
+  {
+    "name": "Golden Cytoserocin",
+    "category": "cytoserocin",
+    "shade": "golden",
+    "boosterFamily": "Crash",
+    "regions": [
+      "Lonetrek (low-sec)",
+      "Tenal (09-4XW)"
+    ]
+  },
+  {
+    "name": "Lime Cytoserocin",
+    "category": "cytoserocin",
+    "shade": "lime",
+    "boosterFamily": "Frentix",
+    "regions": [
+      "Derelik (low-sec)",
+      "Catch (9HXQ-G)"
+    ]
+  },
+  {
+    "name": "Malachite Cytoserocin",
+    "category": "cytoserocin",
+    "shade": "malachite",
+    "boosterFamily": "Mindflood",
+    "regions": [
+      "Aridia (low-sec)",
+      "Delve (OK-FEM)"
+    ]
+  },
+  {
+    "name": "Vermillion Cytoserocin",
+    "category": "cytoserocin",
+    "shade": "vermillion",
+    "boosterFamily": "X-Instinct",
+    "regions": [
+      "Heimatar (low-sec)",
+      "Feythabolis (I-3ODK)"
+    ]
+  },
+  {
+    "name": "Viridian Cytoserocin",
+    "category": "cytoserocin",
+    "shade": "viridian",
+    "boosterFamily": "Drop",
+    "regions": [
+      "Placid (low-sec)",
+      "Cloud Ring (Assilot)"
+    ]
+  },
+  {
+    "name": "Amber Mykoserocin",
+    "category": "mykoserocin",
+    "shade": "amber",
+    "boosterFamily": "Blue Pill",
+    "regions": [
+      "Black Rise",
+      "Everyshore",
+      "Lonetrek",
+      "Outer Passage",
+      "Sinq Laison",
+      "The Citadel",
+      "The Forge",
+      "The Spire",
+      "Vale of the Silent"
+    ]
+  },
+  {
+    "name": "Azure Mykoserocin",
+    "category": "mykoserocin",
+    "shade": "azure",
+    "boosterFamily": "Sooth Sayer",
+    "regions": [
+      "Curse",
+      "Derelik",
+      "Devoid",
+      "The Bleak Lands",
+      "Heimatar",
+      "Molden Heath",
+      "Insmother",
+      "Metropolis",
+      "Tenerifis"
+    ]
+  },
+  {
+    "name": "Celadon Mykoserocin",
+    "category": "mykoserocin",
+    "shade": "celadon",
+    "boosterFamily": "Exile",
+    "regions": [
+      "Domain",
+      "Genesis",
+      "Placid",
+      "Solitude",
+      "Fountain (Pegasus)",
+      "Pure Blind"
+    ]
+  },
+  {
+    "name": "Golden Mykoserocin",
+    "category": "mykoserocin",
+    "shade": "golden",
+    "boosterFamily": "Crash",
+    "regions": [
+      "Black Rise",
+      "Everyshore",
+      "Lonetrek",
+      "Malpais",
+      "Outer Passage",
+      "Perrigen Falls",
+      "Sinq Laison",
+      "The Citadel",
+      "The Spire"
+    ]
+  },
+  {
+    "name": "Lime Mykoserocin",
+    "category": "mykoserocin",
+    "shade": "lime",
+    "boosterFamily": "Frentix",
+    "regions": [
+      "Aridia",
+      "Curse",
+      "Derelik",
+      "Kador",
+      "Khanid",
+      "Kor-Azor",
+      "Omist",
+      "Solitude",
+      "Wicked Creek"
+    ]
+  },
+  {
+    "name": "Malachite Mykoserocin",
+    "category": "mykoserocin",
+    "shade": "malachite",
+    "boosterFamily": "Mindflood",
+    "regions": [
+      "Aridia",
+      "Curse",
+      "Insmother",
+      "Khanid",
+      "Kor-Azor",
+      "Omist",
+      "Solitude",
+      "Tash-Murkon"
+    ]
+  },
+  {
+    "name": "Vermillion Mykoserocin",
+    "category": "mykoserocin",
+    "shade": "vermillion",
+    "boosterFamily": "X-Instinct",
+    "regions": [
+      "Curse",
+      "Derelik",
+      "Devoid",
+      "The Bleak Lands",
+      "Great Wildlands",
+      "Heimatar",
+      "Immensea",
+      "Insmother",
+      "Metropolis",
+      "Omist",
+      "Tenerifis"
+    ]
+  },
+  {
+    "name": "Viridian Mykoserocin",
+    "category": "mykoserocin",
+    "shade": "viridian",
+    "boosterFamily": "Drop",
+    "regions": [
+      "Domain",
+      "Essence",
+      "Fountain",
+      "Genesis",
+      "Placid",
+      "Pure Blind",
+      "Tenal",
+      "Venal"
+    ]
+  }
+]

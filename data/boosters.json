@@ -1,0 +1,86 @@
+{
+  "families": [
+    {
+      "family": "Blue Pill",
+      "shade": "amber"
+    },
+    {
+      "family": "Exile",
+      "shade": "celadon"
+    },
+    {
+      "family": "Mindflood",
+      "shade": "malachite"
+    },
+    {
+      "family": "X-Instinct",
+      "shade": "vermillion"
+    },
+    {
+      "family": "Drop",
+      "shade": "viridian"
+    },
+    {
+      "family": "Frentix",
+      "shade": "lime"
+    },
+    {
+      "family": "Sooth Sayer",
+      "shade": "azure"
+    },
+    {
+      "family": "Crash",
+      "shade": "golden"
+    }
+  ],
+  "tiers": [
+    {
+      "key": "synth",
+      "label": "Synth",
+      "prefix": "Synth",
+      "isPure": false
+    },
+    {
+      "key": "standard",
+      "label": "Standard",
+      "prefix": "Standard",
+      "isPure": false
+    },
+    {
+      "key": "improved",
+      "label": "Improved",
+      "prefix": "Improved",
+      "isPure": false
+    },
+    {
+      "key": "strong",
+      "label": "Strong",
+      "prefix": "Strong",
+      "isPure": false
+    },
+    {
+      "key": "pure_synth",
+      "label": "Pure Synth",
+      "prefix": "Pure Synth",
+      "isPure": true
+    },
+    {
+      "key": "pure_standard",
+      "label": "Pure Standard",
+      "prefix": "Pure Standard",
+      "isPure": true
+    },
+    {
+      "key": "pure_improved",
+      "label": "Pure Improved",
+      "prefix": "Pure Improved",
+      "isPure": true
+    },
+    {
+      "key": "pure_strong",
+      "label": "Pure Strong",
+      "prefix": "Pure Strong",
+      "isPure": true
+    }
+  ]
+}

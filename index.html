@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>EVE Booster & Gas Calculator</title>
+  <meta name="description" content="EVE Online booster crafting calculator with live market data (Fuzzworks + Adam4EVE)." />
+  <link rel="stylesheet" href="./assets/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <h1>EVE Booster & Gas Calculator</h1>
+      <p class="muted">
+        Live market data via Fuzzworks (hub prices) and Adam4EVE (history / trade estimates).
+        Works as a static site (GitHub Pages).
+      </p>
+      <div class="pill-row">
+        <span class="pill" id="lastUpdated">Last update: …</span>
+        <span class="pill pill-warn" id="apiStatus">APIs: initializing…</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>Booster build calculator</h2>
+
+      <div class="grid grid-3">
+        <div>
+          <label for="boosterSelect">Booster / Pure compound</label>
+          <select id="boosterSelect"></select>
+          <div class="muted small">Includes Synth/Standard/Improved/Strong and Pure variants.</div>
+        </div>
+
+        <div>
+          <label for="bpcCost">BPC cost (ISK)</label>
+          <input id="bpcCost" type="number" min="0" step="0.01" value="0" />
+          <div class="muted small">Optional: spread across the total runs you enter.</div>
+        </div>
+
+        <div>
+          <label for="totalRuns">Total runs</label>
+          <input id="totalRuns" type="number" min="1" step="1" value="1" />
+          <div class="muted small">Manufacturing runs of the selected blueprint/formula.</div>
+        </div>
+      </div>
+
+      <div class="grid grid-4">
+        <div>
+          <label for="expansionDepth">Material expansion depth</label>
+          <select id="expansionDepth">
+            <option value="0">Direct inputs only</option>
+            <option value="1">Expand boosters</option>
+            <option value="2" selected>Expand boosters + fuel blocks (shows isotopes)</option>
+          </select>
+          <div class="muted small">Controls how far the “materials for materials” breakdown goes.</div>
+        </div>
+
+        <div>
+          <label for="costHub">Costing hub</label>
+          <select id="costHub"></select>
+          <div class="muted small">This hub is used for the cost summary.</div>
+        </div>
+
+        <div>
+          <label for="inputPriceMode">Input price mode</label>
+          <select id="inputPriceMode">
+            <option value="sell_min" selected>Sell min (instant buy)</option>
+            <option value="buy_max">Buy max (buy order)</option>
+          </select>
+          <div class="muted small">Which market price to assume you pay for inputs.</div>
+        </div>
+
+        <div>
+          <label for="outputPriceMode">Output price mode</label>
+          <select id="outputPriceMode">
+            <option value="sell_min" selected>Sell min (sell order)</option>
+            <option value="buy_max">Buy max (instant sell)</option>
+          </select>
+          <div class="muted small">Which market price to assume you receive for output.</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="calcBtn" class="btn-primary">Fetch materials & calculate</button>
+        <label class="checkbox">
+          <input id="showProfit" type="checkbox" checked />
+          Show profit estimate (no taxes/fees)
+        </label>
+      </div>
+
+      <div id="calcStatus" class="muted"></div>
+
+      <div id="calcSummary" class="summary-grid"></div>
+
+      <details open class="mt">
+        <summary><strong>Direct materials (per run and total)</strong></summary>
+        <div class="table-wrap">
+          <table class="table" id="directMaterialsTable">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th class="num">Qty / run</th>
+                <th class="num">Qty total</th>
+                <th>Hub prices (sell min / buy max)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </details>
+
+      <details class="mt">
+        <summary><strong>Expanded “materials for materials” (raw-ish totals)</strong></summary>
+        <div class="muted small">
+          This expands boosters and (optionally) fuel blocks to show precursors like isotopes.
+          Numbers may include small overproduction due to whole-run rounding.
+        </div>
+        <div class="table-wrap">
+          <table class="table" id="rawMaterialsTable">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th class="num">Qty total</th>
+                <th class="num">Qty / run</th>
+                <th class="num">Unit price (cost hub)</th>
+                <th class="num">Cost total (cost hub)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </details>
+
+      <details class="mt">
+        <summary><strong>Output market snapshot (hub prices + listed volume + est. trades/day)</strong></summary>
+        <div class="muted small">
+          Listed volumes are from Fuzzworks aggregates. Trades/day uses Adam4EVE tracker (yesterday, sell-side).
+        </div>
+        <div class="table-wrap">
+          <table class="table" id="marketStatsTable">
+            <thead>
+              <tr>
+                <th>Hub</th>
+                <th class="num">Sell min</th>
+                <th class="num">Buy max</th>
+                <th class="num">Sell listed</th>
+                <th class="num">Buy listed</th>
+                <th class="num">Est. sold/day</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>Gas live counter</h2>
+      <p class="muted small">
+        Sorted by Jita sell min (ISK/unit), descending. Regions are pulled from EVE University’s gas harvesting reference.
+      </p>
+
+      <div class="grid grid-2">
+        <div>
+          <h3>CYTOSEROCIN</h3>
+          <div class="table-wrap">
+            <table class="table" id="cytoTable">
+              <thead>
+                <tr>
+                  <th>Gas</th>
+                  <th>Regions (common)</th>
+                  <th class="num">Jita</th>
+                  <th class="num">Amarr</th>
+                  <th class="num">Dodixie</th>
+                  <th class="num">Rens</th>
+                  <th class="num">7d Δ</th>
+                  <th class="num">Jita sold/day</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h3>MYKOSEROCIN</h3>
+          <div class="table-wrap">
+            <table class="table" id="mykoTable">
+              <thead>
+                <tr>
+                  <th>Gas</th>
+                  <th>Regions (common)</th>
+                  <th class="num">Jita</th>
+                  <th class="num">Amarr</th>
+                  <th class="num">Dodixie</th>
+                  <th class="num">Rens</th>
+                  <th class="num">7d Δ</th>
+                  <th class="num">Jita sold/day</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Booster price board</h2>
+      <p class="muted small">
+        Sorted by Jita sell min (ISK/unit), descending, by category. Click a booster above to run the build calculator.
+      </p>
+
+      <div id="boosterBoards"></div>
+    </section>
+
+    <section class="card">
+      <h2>Live opinion</h2>
+      <div id="opinion" class="prose">
+        Loading…
+      </div>
+      <div class="muted small mt">
+        Note: “Manipulation” here means “thin markets (low depth / low turnover) that can be moved with comparatively less ISK”.
+        This is heuristic, not certainty.
+      </div>
+    </section>
+
+    <footer class="muted small center mt-xl">
+      Built for personal use. EVE Online and all related trademarks are the property of CCP hf.
+    </footer>
+  </main>
+
+  <script src="./assets/app.js" defer></script>
+</body>
+</html>
